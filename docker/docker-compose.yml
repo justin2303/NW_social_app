@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0       # Use the latest MySQL 8.0 image
+    container_name: mysql-db
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: WarlordJetch1488    # Root password for MySQL
+      MYSQL_DATABASE: NW_Players                   # Name of the default database
+      MYSQL_USER: ERB_Napoleon                       # Non-root user
+      MYSQL_PASSWORD: BoaNoite           # Password for the non-root user
+    ports:
+      - "6161:3306"         # Exposes MySQL on the default port 3306
+    volumes:
+      - mysql_data:/var/lib/mysql   # Persist MySQL data in a named volume
+
+volumes:
+  mysql_data:                # Named volume for MySQL data persistence

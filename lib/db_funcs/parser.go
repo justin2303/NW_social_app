@@ -4,6 +4,9 @@ import (
 	"bufio"
 	"fmt"
 	"unicode"
+	"time"
+	"os"
+	"strings"
 )
 
 func ReadLine(scanner *bufio.Scanner) (string, error) {
@@ -79,14 +82,18 @@ func GetActors(line string) []string {
 			}
 			continue
 		} else if inPlayer2 {
-			if r != ' ' {
+			if r != ' ' && r != '.' {
 				player2 += string(r)
 			} else {
 				inPlayer2 = false
 			}
 			continue
 		} else if inGUID {
-			GUID += string(r)
+			if unicode.IsDigit(r){
+				GUID += string(r)
+			}else{
+				inGUID=false
+			}
 			continue
 		}
 
@@ -104,6 +111,15 @@ func GetActors(line string) []string {
 		// If chatbuffer indicates the start of a GUID
 		if chatbuffer == "has joined the game with ID:" {
 			inGUID = true
+			action = "join"
+			continue
+		}else if chatbuffer == "teamkilled"{
+			action = "teamkill"
+			inPlayer2=true
+			continue
+		}else if chatbuffer == "has left the game with ID:"{
+			inGUID = true
+			action = "leave"
 			continue
 		}
 
@@ -116,8 +132,68 @@ func GetActors(line string) []string {
 		return []string{""}
 	}
 	// Return the collected player1, action, player2, and GUID as a slice
+	player1 = strings.ReplaceAll(player1, " ", "")
+	player2 = strings.ReplaceAll(player2, " ", "")
+	GUID = strings.ReplaceAll(GUID, " ", "")
+	action = strings.ReplaceAll(action, " ", "")
 	return []string{player1, action, player2, GUID}
 }
+
+func GetFileName() string{
+	est, err := time.LoadLocation("America/New_York")
+    if err != nil {
+        fmt.Println("Error loading timezone:", err)
+        return ""
+    }
+
+    // Get the current time in EST
+    now := time.Now().In(est)
+    
+    // Format the date as MM_DD_YY
+    formattedDate := now.Format("01_02_06")
+	filename := "server_log_" + formattedDate + ".txt"
+	return filename
+}
+
+func Parse_log_file() {
+	//fname := GetFileName()
+	file, err := os.Open("logs/server_log_09_21_24.txt")
+    if err != nil {
+        fmt.Println("Error opening file:", err)
+        return
+    }
+	defer file.Close()
+	scanner := bufio.NewScanner(file)
+	database := MakeConnection()
+	defer database.Close()
+	for {
+		line, err := ReadLine(scanner)
+		if err != nil {
+			fmt.Println("Error reading line:", err)
+			break
+		}
+		if line == "" {//eof
+			break
+		}
+		time := GetTime(line)
+		actors := GetActors(line)
+		if len(actors)==4{
+			err = InsertToEvent(database,actors, time)
+			if err != nil{
+				fmt.Println("db error: ", err )
+				break
+			}
+		}else{
+			fmt.Println("ignored line: ", line)
+		}
+
+	}
+	UpdateGUIDs1(database)
+	UpdateGUIDs2(database)
+}
+	
+
+
 /*
 func parse_all(file_name string) {
 	file, err := os.Open("yourfile.txt")

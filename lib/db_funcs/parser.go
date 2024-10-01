@@ -3,30 +3,30 @@ package db_funcs
 import (
 	"bufio"
 	"fmt"
-	"unicode"
-	"time"
 	"os"
 	"strings"
+	"time"
+	"unicode"
 )
 
 func ReadLine(scanner *bufio.Scanner) (string, error) {
 	if scanner.Scan() {
-        line := scanner.Text() // Get the first line
-		return line,nil
+		line := scanner.Text() // Get the first line
+		return line, nil
 	}
 	if err := scanner.Err(); err != nil {
-        fmt.Println("Error reading file:", err)
+		fmt.Println("Error reading file:", err)
 		return "", err
-    }
+	}
 	return "", nil // Return empty string if no more lines
 }
 
-func GetTime(line string) string{
+func GetTime(line string) string {
 	for i, r := range line {
 		if unicode.IsDigit(r) {
 			if i+7 <= len(line) {
-                return line[i : i+8]
-            }
+				return line[i : i+8]
+			}
 			return line[i:]
 		}
 	}
@@ -44,7 +44,7 @@ func GetActors(line string) []string {
 	var player1 string
 	var player2 string
 	var GUID string
-	inAction := false  // A flag to track if we're in an action
+	inAction := false // A flag to track if we're in an action
 	inPlayer1 := false
 	inPlayer2 := false
 	skipNextChar := false
@@ -57,13 +57,12 @@ func GetActors(line string) []string {
 			skipNextChar = false
 			continue
 		}
-		
+
 		// If starting an action
 		if r == '<' {
 			inAction = true
 			continue
 		}
-
 
 		if inAction {
 			if r != '>' {
@@ -89,10 +88,10 @@ func GetActors(line string) []string {
 			}
 			continue
 		} else if inGUID {
-			if unicode.IsDigit(r){
+			if unicode.IsDigit(r) {
 				GUID += string(r)
-			}else{
-				inGUID=false
+			} else {
+				inGUID = false
 			}
 			continue
 		}
@@ -113,11 +112,11 @@ func GetActors(line string) []string {
 			inGUID = true
 			action = "join"
 			continue
-		}else if chatbuffer == "teamkilled"{
+		} else if chatbuffer == "teamkilled" {
 			action = "teamkill"
-			inPlayer2=true
+			inPlayer2 = true
 			continue
-		}else if chatbuffer == "has left the game with ID:"{
+		} else if chatbuffer == "has left the game with ID:" {
 			inGUID = true
 			action = "leave"
 			continue
@@ -139,51 +138,77 @@ func GetActors(line string) []string {
 	return []string{player1, action, player2, GUID}
 }
 
-func GetFileName() string{
+func GetFileName() string {
 	est, err := time.LoadLocation("America/New_York")
-    if err != nil {
-        fmt.Println("Error loading timezone:", err)
-        return ""
-    }
+	if err != nil {
+		fmt.Println("Error loading timezone:", err)
+		return ""
+	}
 
-    // Get the current time in EST
-    now := time.Now().In(est)
-    
-    // Format the date as MM_DD_YY
-    formattedDate := now.Format("01_02_06")
+	// Get the current time in EST
+	now := time.Now().In(est)
+
+	// Format the date as MM_DD_YY
+	formattedDate := now.Format("01_02_06")
 	filename := "server_log_" + formattedDate + ".txt"
 	return filename
 }
+func GetFileDate() string {
+	est, err := time.LoadLocation("America/New_York")
+	if err != nil {
+		fmt.Println("Error loading timezone:", err)
+		return ""
+	}
 
-func Parse_log_file() {
+	// Get the current time in EST
+	now := time.Now().In(est)
+
+	// Format the date as MM_DD_YY
+	formattedDate := now.Format("01_02_06")
+	return formattedDate
+}
+
+// HasEventStart checks if the line contains specific phrases and starts with "19:"
+func HasEventStart(line string) bool {
+	return strings.Contains(line, "Has reset the Map.") &&
+		strings.Contains(line, "[SERVER]") &&
+		strings.HasPrefix(line, " 19:")
+}
+
+func ParseLogFile() {
 	//fname := GetFileName()
 	file, err := os.Open("logs/server_log_09_21_24.txt")
-    if err != nil {
-        fmt.Println("Error opening file:", err)
-        return
-    }
+	if err != nil {
+		fmt.Println("Error opening file:", err)
+		return
+	}
 	defer file.Close()
 	scanner := bufio.NewScanner(file)
 	database := MakeConnection()
 	defer database.Close()
+	var event_start bool
 	for {
 		line, err := ReadLine(scanner)
 		if err != nil {
 			fmt.Println("Error reading line:", err)
 			break
 		}
-		if line == "" {//eof
+		if line == "" { //eof
 			break
+		}
+		if !event_start {
+			event_start = HasEventStart(line)
+			//check if event started until it is true, then ignore
 		}
 		time := GetTime(line)
 		actors := GetActors(line)
-		if len(actors)==4{
-			err = InsertToEvent(database,actors, time)
-			if err != nil{
-				fmt.Println("db error: ", err )
+		if len(actors) == 4 {
+			err = InsertToEvent(database, actors, time, event_start)
+			if err != nil {
+				fmt.Println("db error: ", err)
 				break
 			}
-		}else{
+		} else {
 			fmt.Println("ignored line: ", line)
 		}
 
@@ -191,8 +216,6 @@ func Parse_log_file() {
 	UpdateGUIDs1(database)
 	UpdateGUIDs2(database)
 }
-	
-
 
 /*
 func parse_all(file_name string) {
@@ -208,7 +231,7 @@ func parse_all(file_name string) {
 		}
 
 	}
-	
+
 	defer file.Close()
 
 }*/

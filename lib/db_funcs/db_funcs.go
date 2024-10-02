@@ -44,7 +44,8 @@ func ExecuteReadQuery(db *sql.DB, query string) (*sql.Rows, error) {
 	return rows, nil // No error
 }
 func GetGUID(db *sql.DB, uname string) (string, error) {
-	query := "SELECT DISTINCT GUID FROM login_09_21_24 WHERE uname = ? LIMIT 1" //always GUID1 cuz that player_act
+	date := GetFileDate()
+	query := fmt.Sprintf("SELECT DISTINCT GUID FROM login_%s WHERE uname = ? LIMIT 1", date) //always GUID1 cuz that player_act
 	row := db.QueryRow(query, uname)
 	var guid string
 
@@ -62,6 +63,7 @@ func GetGUID(db *sql.DB, uname string) (string, error) {
 }
 
 func InsertToEvent(db *sql.DB, actors []string, datetime string, event_flag bool) error {
+	date := GetFileDate()
 	if strings.Contains(actors[1], "img=ico") {
 		switch actors[1] {
 		case "img=ico_crossbow":
@@ -84,7 +86,7 @@ func InsertToEvent(db *sql.DB, actors []string, datetime string, event_flag bool
 	} //change action to actual
 
 	if actors[3] != "" {
-		ins_q := "INSERT INTO login_09_21_24 (GUID, uname, Action, Time) VALUES (?, ?, ?, ?)"
+		ins_q := fmt.Sprintf("INSERT INTO login_%s (GUID, uname, Action, Time) VALUES (?, ?, ?, ?)", date)
 		_, err := db.Exec(ins_q, actors[3], actors[0], actors[1], datetime)
 		return err
 	} else if !event_flag {
@@ -92,13 +94,13 @@ func InsertToEvent(db *sql.DB, actors []string, datetime string, event_flag bool
 	}
 	if actors[2] != "" {
 		//player 2 exists
-		ins_q := "INSERT INTO event_09_21_24 ( Player_Act, Action, Player_Receive ,Time) VALUES (?, ?, ?, ?)"
+		ins_q := fmt.Sprintf("INSERT INTO event_%s ( Player_Act, Action, Player_Receive ,Time) VALUES (?, ?, ?, ?)", date)
 		_, err := db.Exec(ins_q, actors[0], actors[1], actors[2], datetime)
 		return err
 	}
 	if actors[1] != "" {
 
-		ins_q := "INSERT INTO event_09_21_24 (Player_Act, Action,Time) VALUES (?, ?, ?)"
+		ins_q := fmt.Sprintf("INSERT INTO event_%s (Player_Act, Action,Time) VALUES (?, ?, ?)", date)
 		_, err := db.Exec(ins_q, actors[0], actors[1], datetime)
 		return err
 	}
@@ -108,8 +110,9 @@ func InsertToEvent(db *sql.DB, actors []string, datetime string, event_flag bool
 
 func UpdateGUIDs1(db *sql.DB) error {
 	fmt.Println("reached here")
+	date := GetFileDate()
 	// Step 1: Get distinct Player_Act where GUID1 is null
-	query := "SELECT DISTINCT Player_Act FROM event_09_21_24 WHERE GUID1 IS NULL"
+	query := fmt.Sprintf("SELECT DISTINCT Player_Act FROM event_%s WHERE GUID1 IS NULL", date)
 	rows, err := db.Query(query)
 	if err != nil {
 		return fmt.Errorf("error querying Player_Act: %w", err)
@@ -131,7 +134,7 @@ func UpdateGUIDs1(db *sql.DB) error {
 		}
 
 		// Step 4: Update GUID1 in event_09_21_24
-		updateQuery := "UPDATE event_09_21_24 SET GUID1 = ? WHERE Player_Act = ?"
+		updateQuery := fmt.Sprintf("UPDATE event_%s SET GUID1 = ? WHERE Player_Act = ?", date)
 		_, err = db.Exec(updateQuery, guid, playerAct)
 		if err != nil {
 			log.Printf("Error updating GUID1 for %s: %v", playerAct, err)
@@ -146,7 +149,8 @@ func UpdateGUIDs1(db *sql.DB) error {
 func UpdateGUIDs2(db *sql.DB) error {
 	fmt.Println("reached here")
 	// Step 1: Get distinct Player_Receive where GUID2 is null
-	query := "SELECT DISTINCT Player_Receive FROM event_09_21_24 WHERE GUID2 IS NULL AND Player_Receive is not NULL"
+	date := GetFileDate()
+	query := fmt.Sprintf("SELECT DISTINCT Player_Receive FROM event_%s WHERE GUID2 IS NULL AND Player_Receive is not NULL", date)
 	rows, err := db.Query(query)
 	if err != nil {
 		return fmt.Errorf("error querying Player_Receive: %w", err)
@@ -168,7 +172,7 @@ func UpdateGUIDs2(db *sql.DB) error {
 		}
 
 		// Step 4: Update GUID2 in event_09_21_24
-		updateQuery := "UPDATE event_09_21_24 SET GUID2 = ? WHERE Player_Receive = ?"
+		updateQuery := fmt.Sprintf("UPDATE event_%s SET GUID2 = ? WHERE Player_Receive = ?", date)
 		_, err = db.Exec(updateQuery, guid, Player_Receive)
 		if err != nil {
 			log.Printf("Error updating GUID2 for %s: %v", Player_Receive, err)
@@ -182,7 +186,6 @@ func UpdateGUIDs2(db *sql.DB) error {
 
 func PushNewData() error {
 	date := GetFileDate()
-	date = "09_21_24"
 	query := "SELECT GUID, MIN(uname) AS uname FROM login_" + date + " GROUP BY GUID;"
 	database := MakeConnection()
 	defer database.Close()

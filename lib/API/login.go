@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	wp "hydraulicPress/lib/WorkerPool"
 	"hydraulicPress/lib/db_funcs"
 	"io/ioutil"
 	"net/http"
@@ -53,7 +54,7 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("Login request received"))
 }
 
-func SignupHandler(w http.ResponseWriter, r *http.Request) {
+func SignupHandler(w http.ResponseWriter, r *http.Request, pool *wp.WorkerPool) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
 		return
@@ -104,11 +105,13 @@ func SignupHandler(w http.ResponseWriter, r *http.Request) {
 		Username: uname,
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)         //once signed in, hash the GUID and then create a folder in data/Players with the hashed GUID,
-	hashed_guid := HashGUID(SignupReq.GUID) //hash the guid
-	ins_url_q := fmt.Sprintf("Update All_players SET URL = '%s' where GUID = '%s'", hashed_guid, SignupReq.GUID)
-	database := db_funcs.MakeConnection()
-	db_funcs.ExecuteQuery(database, ins_url_q) //set new url
+	json.NewEncoder(w).Encode(resp) //once signed in, hash the GUID and then create a folder in data/Players with the hashed GUID,
+	pool.Enqueue(func() {
+		hashed_guid := HashGUID(SignupReq.GUID) //hash the guid
+		ins_url_q := fmt.Sprintf("Update All_players SET URL = '%s' where GUID = '%s'", hashed_guid, SignupReq.GUID)
+		database := db_funcs.MakeConnection()
+		db_funcs.ExecuteQuery(database, ins_url_q) //set new url
+	})
 	//insert hashed GUID to URL
 	//prompt user to setup their account, ask if they want a diff userame, ask for recovery mail
 	//create the json with the pass, email, domainname, and emtpy medals and tradin_cards

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"hydraulicPress/lib/API"
+	workerpool "hydraulicPress/lib/WorkerPool"
 	"hydraulicPress/lib/db_funcs"
 	"net/http"
 	"os"
@@ -54,10 +55,14 @@ func main() {
 // StartServer sets up and starts the HTTP server
 func StartServer() *http.Server {
 	// Set up the routes for the API handlers
+	pool := workerpool.NewWorkerPool(10)
 	http.HandleFunc("/login", API.LoginHandler)
-	http.HandleFunc("/signup", API.SignupHandler)
-	http.HandleFunc("/recovery_email", API.SendEmail)
-
+	http.HandleFunc("/signup", func(w http.ResponseWriter, r *http.Request) {
+		API.SignupHandler(w, r, pool)
+	})
+	http.HandleFunc("/recovery_email", func(w http.ResponseWriter, r *http.Request) {
+		API.SendEmail(w, r, pool)
+	})
 	// Create a new HTTP server
 	server := &http.Server{Addr: ":8080"}
 

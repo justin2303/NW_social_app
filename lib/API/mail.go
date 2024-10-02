@@ -3,6 +3,7 @@ package API
 import (
 	"encoding/json"
 	"fmt"
+	wp "hydraulicPress/lib/WorkerPool"
 	"io/ioutil"
 	"net/http"
 
@@ -14,7 +15,7 @@ type EmailRequest struct {
 	Domain string `json:"Domain"`
 }
 
-func SendEmail(w http.ResponseWriter, r *http.Request) {
+func SendEmail(w http.ResponseWriter, r *http.Request, pool *wp.WorkerPool) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
 		return
@@ -36,7 +37,6 @@ func SendEmail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	fmt.Printf("Auth req from %s@%s\n", Email_req.Email, Email_req.Domain)
-
 	// Define the SMTP server and authentication details
 	smtpHost := "smtp.gmail.com"
 	smtpPort := 587
@@ -46,25 +46,25 @@ func SendEmail(w http.ResponseWriter, r *http.Request) {
 	password := "qdyl mrjt hwvs vkdo" // App password generated from Google
 
 	to := "justin.ypc@gmail.com"
+	pool.Enqueue(func() {
+		// Set up the message
+		msg := gomail.NewMessage()
+		msg.SetHeader("From", from)
+		msg.SetHeader("To", to)
+		msg.SetHeader("Subject", "Test Email from Go")
+		msg.SetBody("text/html", "Hello, this is a test email from Go using Gmail SMTP!")
 
-	// Set up the message
-	msg := gomail.NewMessage()
-	msg.SetHeader("From", from)
-	msg.SetHeader("To", to)
-	msg.SetHeader("Subject", "Test Email from Go")
-	msg.SetBody("text/html", "Hello, this is a test email from Go using Gmail SMTP!")
+		// Set up the SMTP dialer
+		d := gomail.NewDialer(smtpHost, smtpPort, from, password)
 
-	// Set up the SMTP dialer
-	d := gomail.NewDialer(smtpHost, smtpPort, from, password)
-
-	// Send the email
-	if err := d.DialAndSend(msg); err != nil {
-		fmt.Println("Error sending email:", err)
-	} else {
-		fmt.Println("Email sent successfully!")
-	}
+		// Send the email
+		if err := d.DialAndSend(msg); err != nil {
+			fmt.Println("Error sending email:", err)
+		} else {
+			fmt.Println("Email sent successfully!")
+		}
+	})
 	//success
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("Email sent successfully!"))
-	fmt.Println("Email sent successfully!")
 }

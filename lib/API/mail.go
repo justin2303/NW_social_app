@@ -52,7 +52,7 @@ func SendEmail(w http.ResponseWriter, r *http.Request, pool *wp.WorkerPool) {
 	from := "61e.Hussars.NA@gmail.com"
 	password := "qdyl mrjt hwvs vkdo" // App password generated from Google
 
-	to := "justin.ypc@gmail.com"
+	to := Email_req.Email + "@" + Email_req.Domain
 	v_code := GenerateCode()
 	pool.Enqueue(func() {
 		// Set up the message

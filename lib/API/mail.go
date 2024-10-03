@@ -6,8 +6,15 @@ import (
 	wp "hydraulicPress/lib/WorkerPool"
 	"io/ioutil"
 	"net/http"
+	"os"
+	"sync"
 
 	"gopkg.in/gomail.v2"
+)
+
+var (
+	v_file sync.Mutex // Define the mutex
+
 )
 
 type EmailRequest struct {
@@ -46,14 +53,26 @@ func SendEmail(w http.ResponseWriter, r *http.Request, pool *wp.WorkerPool) {
 	password := "qdyl mrjt hwvs vkdo" // App password generated from Google
 
 	to := "justin.ypc@gmail.com"
+	v_code := GenerateCode()
 	pool.Enqueue(func() {
 		// Set up the message
+		v_file.Lock()
+		verificationCodes := make(map[string]string)
+		file, _ := os.OpenFile("./data/verification/codes.json", os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
+		// Decode the JSON data into the map
+		decoder := json.NewDecoder(file)
+		decoder.Decode(&verificationCodes)
+		verificationCodes[Email_req.Email] = v_code
+		jsonData, _ := json.MarshalIndent(verificationCodes, "", "    ")
+		file.Write(jsonData)
+		file.Close()
+		v_file.Unlock()
 		msg := gomail.NewMessage()
 		msg.SetHeader("From", from)
 		msg.SetHeader("To", to)
-		msg.SetHeader("Subject", "Test Email from Go")
-		msg.SetBody("text/html", "Hello, this is a test email from Go using Gmail SMTP!")
-
+		msg.SetHeader("Subject", "NW Email Verification")
+		message_str := v_code + " is your verification code, enter it within the next 2 minutes to verify your email."
+		msg.SetBody("text/html", message_str)
 		// Set up the SMTP dialer
 		d := gomail.NewDialer(smtpHost, smtpPort, from, password)
 

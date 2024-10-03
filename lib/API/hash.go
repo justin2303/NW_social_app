@@ -3,6 +3,9 @@ package API
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"math/rand"
+	"strconv"
+	"time"
 )
 
 func HashGUID(guid string) string {
@@ -19,4 +22,15 @@ func HashGUID(guid string) string {
 	hashString := hex.EncodeToString(hashBytes)
 
 	return hashString
+}
+
+func GenerateCode() string {
+	rand.Seed(time.Now().UnixNano())
+	var result string
+	for i := 0; i < 8; i++ {
+		// Generate a random number between 0 and 9
+		num := rand.Intn(10)
+		result += strconv.Itoa(num)
+	}
+	return result
 }

@@ -58,12 +58,14 @@ func SendEmail(w http.ResponseWriter, r *http.Request, pool *wp.WorkerPool) {
 		// Set up the message
 		v_file.Lock()
 		verificationCodes := make(map[string]string)
-		file, _ := os.OpenFile("./data/verification/codes.json", os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
+		file, _ := os.OpenFile("./data/verification/codes.json", os.O_RDWR|os.O_CREATE, 0644)
 		// Decode the JSON data into the map
 		decoder := json.NewDecoder(file)
 		decoder.Decode(&verificationCodes)
 		verificationCodes[Email_req.Email] = v_code
 		jsonData, _ := json.MarshalIndent(verificationCodes, "", "    ")
+		file.Truncate(0)
+		file.Seek(0, 0)
 		file.Write(jsonData)
 		file.Close()
 		v_file.Unlock()

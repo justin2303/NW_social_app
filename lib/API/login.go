@@ -1,6 +1,7 @@
 package API
 
 import (
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -8,6 +9,7 @@ import (
 	"hydraulicPress/lib/db_funcs"
 	"io/ioutil"
 	"net/http"
+	"os"
 )
 
 type LoginRequest struct {
@@ -22,9 +24,17 @@ type SignupResponse struct {
 	Message  string `json:"message"`
 	Username string `json:"username,omitempty"`
 }
+type UserConfig struct {
+	Password     string                 `json:"password"`
+	Gmail        string                 `json:"gmail"`
+	DomainName   string                 `json:"domain_name"`
+	TradingCards []string               `json:"trading_cards"`
+	Medals       map[string]interface{} `json:"medals"` // Change the type as needed
+}
 
 func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	// Only accept POST requests
+
 	if r.Method != http.MethodPost {
 		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
 		return
@@ -46,12 +56,14 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Print the received body
-	fmt.Printf("Received Login Request: GUID=%s, Password=%s\n", loginRequest.GUID, loginRequest.Password)
-	//db_funcs. fetch GUID and all stats from All_players, first make parse func for that
-	// Send a response back
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("Login request received"))
+	if VerifyLogin(loginRequest.GUID, loginRequest.Password) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("valid login"))
+	} else {
+		w.WriteHeader(http.StatusNotFound)
+		w.Write([]byte("invalid login"))
+	}
+
 }
 
 func SignupHandler(w http.ResponseWriter, r *http.Request, pool *wp.WorkerPool) {
@@ -111,6 +123,7 @@ func SignupHandler(w http.ResponseWriter, r *http.Request, pool *wp.WorkerPool) 
 		ins_url_q := fmt.Sprintf("Update All_players SET URL = '%s' where GUID = '%s'", hashed_guid, SignupReq.GUID)
 		database := db_funcs.MakeConnection()
 		db_funcs.ExecuteQuery(database, ins_url_q) //set new url
+		CreateUserConfig(hashed_guid, SignupReq.Password)
 	})
 	//insert hashed GUID to URL
 	//prompt user to setup their account, ask if they want a diff userame, ask for recovery mail
@@ -119,6 +132,78 @@ func SignupHandler(w http.ResponseWriter, r *http.Request, pool *wp.WorkerPool) 
 
 }
 
-func CreateUserConfig(w http.ResponseWriter, r *http.Request) {
+func CreateUserConfig(hashed_guid string, password string) {
+	user_config := UserConfig{
+		Password:     password,
+		Gmail:        "",
+		DomainName:   "",
+		TradingCards: []string{},
+		Medals:       make(map[string]interface{}), // Initialize the map
+	}
+	jsonData, err := json.MarshalIndent(user_config, "", "  ")
+	// Create a file named guid + ".json"
+	filename := hashed_guid + "/user_config.json"
+	filename = "./data/Players/" + filename
+	dirPath := "./data/Players/" + hashed_guid
 
+	// Create the directory if it doesn't exist
+	err = os.MkdirAll(dirPath, os.ModePerm) // Create the directory if it doesn't exist
+	if err != nil {
+		fmt.Println("Error creating directory:", err)
+		return
+	}
+	file, err := os.Create(filename)
+	if err != nil {
+		fmt.Println("Error creating file:", err)
+		return
+	}
+	defer file.Close() // Ensure the file is closed after writing
+
+	// Write JSON data to the file
+	_, err = file.Write(jsonData)
+	if err != nil {
+		fmt.Println("Error writing to file:", err)
+		return
+	}
+
+}
+func VerifyLogin(guid string, pass string) bool {
+	url_q := "select URL from All_players where GUID = ? limit 1"
+	db := db_funcs.MakeConnection()
+	// Execute the query
+	defer db.Close()
+	var URL sql.NullString
+	row := db.QueryRow(url_q, guid) // Use QueryRow for single row results
+	fmt.Println("GUID: ", guid)
+
+	// Check for error during query execution
+	if err := row.Scan(&URL); err != nil {
+		if err == sql.ErrNoRows {
+			// No rows found
+			return false
+		}
+		// Other scanning errors
+		fmt.Println("Error scanning row:", err)
+		return false
+	}
+
+	// Check if URL is valid
+	if !URL.Valid {
+		fmt.Println("URL is NULL or invalid.")
+		return false
+	}
+
+	fmt.Println("URL: ", URL.String)
+	filename := "./data/Players/" + URL.String + "/user_config.json"
+	file, err := os.OpenFile(filename, os.O_RDONLY, 0644)
+	if err != nil {
+		fmt.Println("error opening file")
+		return false
+	}
+	defer file.Close()
+	user_json := make(map[string]string)
+	decoder := json.NewDecoder(file)
+	decoder.Decode(&user_json)
+	password := user_json["password"]
+	return password == pass
 }

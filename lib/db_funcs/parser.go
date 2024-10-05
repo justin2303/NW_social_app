@@ -177,7 +177,8 @@ func HasEventStart(line string) bool {
 
 func ParseLogFile() {
 	//fname := GetFileName()
-	file, err := os.Open("logs/server_log_09_21_24.txt")
+	fname := "logs/server_log_" + GetFileDate() + ".txt"
+	file, err := os.Open(fname)
 	if err != nil {
 		fmt.Println("Error opening file:", err)
 		return
@@ -215,6 +216,7 @@ func ParseLogFile() {
 	}
 	UpdateGUIDs1(database)
 	UpdateGUIDs2(database)
+	PushNewData()
 }
 
 /*

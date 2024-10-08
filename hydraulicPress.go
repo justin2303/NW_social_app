@@ -11,6 +11,8 @@ import (
 	"os/signal"
 	"sync"
 	"time"
+
+	"github.com/gorilla/handlers"
 )
 
 // Main function to start and manage the server
@@ -63,8 +65,20 @@ func StartServer() *http.Server {
 	http.HandleFunc("/recovery_email", func(w http.ResponseWriter, r *http.Request) {
 		API.SendEmail(w, r, pool)
 	})
+	http.HandleFunc("/home_page", func(w http.ResponseWriter, r *http.Request) {
+		API.HomePageHandler(w, r, pool)
+	})
+
+	corsHandler := handlers.CORS(
+		handlers.AllowedOrigins([]string{"*"}), // Allow all origins for testing; adjust for production
+		handlers.AllowedMethods([]string{"GET", "POST", "OPTIONS"}),
+		handlers.AllowedHeaders([]string{"Content-Type"}),
+	)(http.DefaultServeMux)
 	// Create a new HTTP server
-	server := &http.Server{Addr: ":8080"}
+	server := &http.Server{
+		Addr:    ":8080",
+		Handler: corsHandler, // Set the CORS handler here
+	}
 
 	// Start the server
 	fmt.Println("Starting server on :8080...")

@@ -24,6 +24,7 @@ type SignupResponse struct {
 	Message  string `json:"message"`
 	Username string `json:"username,omitempty"`
 }
+
 type UserConfig struct {
 	Password     string                 `json:"password"`
 	Gmail        string                 `json:"gmail"`

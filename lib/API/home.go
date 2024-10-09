@@ -14,17 +14,15 @@ type HomePageReq struct {
 	GUID string `json:"GUID"`
 }
 type HomePageResp1 struct {
-	Kills     [][]string `json:"Kills"`
-	Teamkills [][]string `json:"Teamkills"`
+	Kills [][]string `json:"Kills"`
 }
 type HomePageResp2 struct {
 	Deaths [][]string `json:"Deaths"`
 }
 type HomePageCombinedResp struct {
-	Kills     [][]string `json:"Kills"`
-	Teamkills [][]string `json:"Teamkills"`
-	Deaths    [][]string `json:"Deaths"`
-	Logins    [][]string `json:"Logins"`
+	Kills  [][]string `json:"Kills"`
+	Deaths [][]string `json:"Deaths"`
+	Logins [][]string `json:"Logins"`
 }
 
 func HomePageHandler(w http.ResponseWriter, r *http.Request, pool *wp.WorkerPool) {
@@ -73,11 +71,11 @@ func HomePageHandler(w http.ResponseWriter, r *http.Request, pool *wp.WorkerPool
 	deathresp := <-deathschan
 	jlresp := <-loginschan
 	fmt.Println("channels returned")
+	fmt.Println("amount of login data: ", len(jlresp))
 	combined_resp := HomePageCombinedResp{
-		Kills:     killresp.Kills,
-		Teamkills: killresp.Teamkills,
-		Deaths:    deathresp.Deaths,
-		Logins:    jlresp,
+		Kills:  killresp.Kills,
+		Deaths: deathresp.Deaths,
+		Logins: jlresp,
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
@@ -96,30 +94,24 @@ func HomePageHandler(w http.ResponseWriter, r *http.Request, pool *wp.WorkerPool
 }
 
 func GetHPKills(guid_to_fetch string) HomePageResp1 {
-	fetch_query := "select Action, Player_Receive, Time from event_09_21_24 where GUID1 = ? AND GUID2 is not null order by Time"
+	lastSat := db_funcs.GetLastSat()
+	lastSat = "09_21_24"
+	fetch_query := fmt.Sprintf("select Action, Player_Receive, Time from event_%s where GUID1 = ? AND GUID2 is not null order by Time", lastSat)
 	var Action, Player_Receive, Time sql.NullString
 	var kills [][]string
-	var tks [][]string
-
+	resp := HomePageResp1{
+		Kills: kills,
+	}
 	db := db_funcs.MakeConnection()
 	rows, err := db.Query(fetch_query, guid_to_fetch)
 	if err != nil {
 		fmt.Println("query error for guid: ", guid_to_fetch)
-		resp := HomePageResp1{
-			Kills:     kills,
-			Teamkills: tks,
-		}
 		return resp
 	}
 	for rows.Next() {
 		fmt.Println("parsing row")
 		if err := rows.Scan(&Action, &Player_Receive, &Time); err != nil {
 			fmt.Println("query error")
-			resp := HomePageResp1{
-				Kills:     kills,
-				Teamkills: tks,
-			}
-
 			return resp
 		}
 		if !Player_Receive.Valid {
@@ -127,22 +119,22 @@ func GetHPKills(guid_to_fetch string) HomePageResp1 {
 		}
 		if Action.String == "teamkill" {
 			if len(kills) > 0 && kills[len(kills)-1][2] == Time.String {
-				tks = append(tks, []string{kills[len(kills)-1][0], Player_Receive.String, Time.String})
-				kills = kills[:len(kills)-1]
+				kills[len(kills)-1][0] = "teamkill"
 
 				continue //skip the rest, we just wanna remove thelast if it was recorded.
 			}
 		}
+
 		kills = append(kills, []string{Action.String, Player_Receive.String, Time.String})
 	}
-	resp := HomePageResp1{
-		Kills:     kills,
-		Teamkills: tks,
-	}
+	resp.Kills = kills
+
 	return resp
 }
 func GetHPDeaths(guid_to_fetch string) HomePageResp2 {
-	fetch_query := "select Action, Player_Act, Time from event_09_21_24 where GUID2 = ? AND GUID1 is not null order by Time"
+	lastSat := db_funcs.GetLastSat()
+	lastSat = "09_21_24"
+	fetch_query := fmt.Sprintf("select Action, Player_Act, Time from event_%s where GUID2 = ? AND GUID1 is not null order by Time", lastSat)
 	var Action, Player_Act, Time sql.NullString
 	var deaths [][]string
 	db := db_funcs.MakeConnection()
@@ -179,7 +171,9 @@ func GetHPDeaths(guid_to_fetch string) HomePageResp2 {
 }
 
 func GetHPJoinLeave(guid_to_fetch string) [][]string {
-	fetch_query := "select Action, Time from login_09_21_24 where GUID = ?"
+	lastSat := db_funcs.GetLastSat()
+	lastSat = "09_21_24"
+	fetch_query := fmt.Sprintf("select Action, Time from login_%s where GUID = ?", lastSat)
 	var Action, Time sql.NullString
 	var logins [][]string
 	db := db_funcs.MakeConnection()

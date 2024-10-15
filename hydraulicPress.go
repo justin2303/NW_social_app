@@ -65,6 +65,7 @@ func StartServer() *http.Server {
 	http.HandleFunc("/recovery_email", func(w http.ResponseWriter, r *http.Request) {
 		API.SendEmail(w, r, pool)
 	})
+	http.HandleFunc("/login", API.VerifyEmail)
 	http.HandleFunc("/home_page", func(w http.ResponseWriter, r *http.Request) {
 		API.HomePageHandler(w, r, pool)
 	})

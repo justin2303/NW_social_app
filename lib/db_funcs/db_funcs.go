@@ -291,3 +291,38 @@ func CheckGUIDexists(guid string) (string, error) {
 	// GUID found
 	return "", nil
 }
+func GetRegiment(guid string) string {
+	db := MakeConnection()
+	defer db.Close()
+	query := "Select Reg from All_players where GUID = ?"
+	var Regiment sql.NullString
+
+	err := db.QueryRow(query, guid).Scan(&Regiment)
+	if err != nil {
+		fmt.Println("what the hel?? how did you call get reg for a non-existing GUID???")
+		return ""
+	}
+	if Regiment.Valid {
+		return Regiment.String
+	}
+	return "pub" //this means public player. short for pubbie
+
+}
+
+func GetHashedGUID(guid string) string {
+	db := MakeConnection()
+	defer db.Close()
+	query := "Select URL from All_players where GUID = ?"
+	var URL sql.NullString
+
+	err := db.QueryRow(query, guid).Scan(&URL)
+	if err != nil {
+		fmt.Println("what the hel?? how did you call get reg for a non-existing GUID???")
+		return ""
+	}
+	if URL.Valid {
+		return URL.String
+	}
+	return guid
+
+}

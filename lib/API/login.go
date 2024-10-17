@@ -168,6 +168,47 @@ func CreateUserConfig(hashed_guid string, password string) {
 	}
 
 }
+func UpdateUserMail(hashed_guid string, Mail string, Domain string) error {
+	filePath := "./data/Players/" + hashed_guid + "/user_config.json"
+	file, err := os.Open(filePath)
+	if err != nil {
+		return fmt.Errorf("failed to open file: %w", err)
+	}
+	defer file.Close()
+
+	// Step 2: Parse the file's JSON content into a struct
+	var userConfig UserConfig
+	decoder := json.NewDecoder(file)
+	if err := decoder.Decode(&userConfig); err != nil {
+		return fmt.Errorf("failed to decode JSON: %w", err)
+	}
+
+	// Step 3: Update the "Mail" and "Domain" keys
+	userConfig.Gmail = Mail
+	userConfig.DomainName = Domain
+
+	// Step 4: Marshal the updated struct back to JSON
+	updatedData, err := json.MarshalIndent(userConfig, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal JSON: %w", err)
+	}
+
+	// Step 5: Open the file for writing (truncate it before writing)
+	fileWrite, err := os.OpenFile(filePath, os.O_WRONLY|os.O_TRUNC, 0644)
+	if err != nil {
+		return fmt.Errorf("failed to open file for writing: %w", err)
+	}
+	defer fileWrite.Close()
+
+	// Step 6: Write the updated JSON back to the file
+	_, err = fileWrite.Write(updatedData)
+	if err != nil {
+		return fmt.Errorf("failed to write to file: %w", err)
+	}
+
+	fmt.Println("User config updated successfully!")
+	return nil
+}
 func VerifyLogin(guid string, pass string) bool {
 	url_q := "select URL from All_players where GUID = ? limit 1"
 	db := db_funcs.MakeConnection()

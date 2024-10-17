@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	wp "hydraulicPress/lib/WorkerPool"
+	"hydraulicPress/lib/db_funcs"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -128,9 +129,25 @@ func VerifyEmail(w http.ResponseWriter, r *http.Request) {
 	file.Close()
 	v_file.Unlock()
 	if actual_code == Verify_req.Verification {
+		query := "SELECT URL FROM All_players WHERE GUID = ?"
+		db := db_funcs.MakeConnection()
+		var url string
+		err := db.QueryRow(query, Verify_req.GUID).Scan(&url)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		err = UpdateUserMail(url, Verify_req.Email, Verify_req.Domain)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
 		w.WriteHeader(http.StatusOK)
+		fmt.Println("verified!")
 
 	} else {
 		w.WriteHeader(http.StatusUnauthorized) //in the future verification errors should be unauthorized status.
+		fmt.Println("wrong code!, actual code is: ", actual_code)
+		fmt.Println("and not: ", Verify_req.Verification)
 	}
 }

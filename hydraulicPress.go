@@ -69,6 +69,9 @@ func StartServer() *http.Server {
 	http.HandleFunc("/home_page", func(w http.ResponseWriter, r *http.Request) {
 		API.HomePageHandler(w, r, pool)
 	})
+	http.HandleFunc("/navigation", func(w http.ResponseWriter, r *http.Request) {
+		API.Navigation(w, r, pool)
+	})
 
 	corsHandler := handlers.CORS(
 		handlers.AllowedOrigins([]string{"*"}), // Allow all origins for testing; adjust for production

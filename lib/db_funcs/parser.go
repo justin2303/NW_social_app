@@ -196,7 +196,8 @@ func HasEventStart(line string) bool {
 
 func ParseLogFile() {
 	//fname := GetFileName()
-	fname := "logs/server_log_" + GetFileDate() + ".txt"
+
+	fname := "logs/server_log_" + GetLastSat() + ".txt"
 	file, err := os.Open(fname)
 	if err != nil {
 		fmt.Println("Error opening file:", err)
@@ -206,6 +207,23 @@ func ParseLogFile() {
 	scanner := bufio.NewScanner(file)
 	database := MakeConnection()
 	defer database.Close()
+	create_event_q := "CREATE TABLE event_" + GetLastSat() + ` (
+    GUID1 VARCHAR(255) NULL,
+    GUID2 VARCHAR(255) NULL,
+    Player_Act VARCHAR(255) NULL,
+    Action VARCHAR(255) NULL,
+    Player_Receive VARCHAR(255) NULL,
+    Time VARCHAR(255) NULL
+);`
+	create_login_q := "CREATE TABLE login_" + GetLastSat() + ` (
+		GUID VARCHAR(255) NULL,
+		uname VARCHAR(255) NULL,
+		Action VARCHAR(255) NULL,
+		Time VARCHAR(255) NULL
+	);`
+
+	ExecuteQuery(database, create_event_q)
+	ExecuteQuery(database, create_login_q)
 	var event_start bool
 	for {
 		line, err := ReadLine(scanner)

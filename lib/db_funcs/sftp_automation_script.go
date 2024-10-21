@@ -1,31 +1,29 @@
-package  db_funcs
+package db_funcs
 
 import (
 	"fmt"
 	"io"
 	"os"
-	"time"
 
 	"github.com/pkg/sftp"
 	"golang.org/x/crypto/ssh"
 )
 
-func    SftpConnect()  {
+func SftpFileDownload() {
 	// SFTP server details
 	sftpServer := "199.127.62.40:8822" // srvr
 	sftpUser := "FreddyFazbearXXX"     // user
 	sftpPass := "asssniper"            // pass
 
 	// Get Current Date
-	currentDate := time.Now()
-	dateString := currentDate.Format("01_02_06") // Format as MM-DD-YY
+	dateString := GetLastSat()
 	remoteFile := fmt.Sprintf("/199.127.62.40_7240/Logs/server_log_%s.txt", dateString)
 
 	fmt.Println("Using current date:", dateString)
 	fmt.Println("Remote file path:", remoteFile)
 
 	// Change local file object with current date
-	localFile := fmt.Sprintf("./logs/server_log_%02d_%02d_%02d.txt", currentDate.Month(), currentDate.Day(), currentDate.Year()%100)
+	localFile := fmt.Sprintf("./logs/server_log_%s.txt", dateString)
 	fmt.Println("Local file will be saved as:", localFile)
 
 	// Create logs directory if it doesn't exist
@@ -90,4 +88,3 @@ func    SftpConnect()  {
 
 	fmt.Println("TOTAL SUCCESS!!!!! 61E WINS AGAIN!!!:", localFile)
 }
-

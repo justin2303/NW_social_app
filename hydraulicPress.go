@@ -33,7 +33,7 @@ func main() {
 		signal.Notify(sigs, os.Interrupt)
 
 		// Check for scheduled shutdown every minute
-		go ShutdownAndParse(sigs)
+		go SignalShutdown(sigs)
 
 		// Block until a signal is received
 		<-sigs
@@ -43,33 +43,30 @@ func main() {
 		if err := server.Shutdown(context.Background()); err != nil {
 			fmt.Println("Error shutting down server:", err)
 		}
-
 		wg.Wait() // Wait for the server goroutine to finish
-		fmt.Println("Server has been shut down. Parsing log file...")
-
-		// Call your log parsing function
-		db_funcs.ParseLogFile()
-
 		fmt.Println("Server will restart...")
+		db_funcs.ParseLogFile()
 	}
 }
 
 // StartServer sets up and starts the HTTP server
 func StartServer() *http.Server {
-	// Set up the routes for the API handlers
+	// Create a new ServeMux to avoid re-registering the same routes
+	mux := http.NewServeMux()
+
 	pool := workerpool.NewWorkerPool(10)
-	http.HandleFunc("/login", API.LoginHandler)
-	http.HandleFunc("/signup", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/login", API.LoginHandler)
+	mux.HandleFunc("/signup", func(w http.ResponseWriter, r *http.Request) {
 		API.SignupHandler(w, r, pool)
 	})
-	http.HandleFunc("/recovery_email", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/recovery_email", func(w http.ResponseWriter, r *http.Request) {
 		API.SendEmail(w, r, pool)
 	})
-	http.HandleFunc("/verify_email", API.VerifyEmail)
-	http.HandleFunc("/home_page", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/verify_email", API.VerifyEmail)
+	mux.HandleFunc("/home_page", func(w http.ResponseWriter, r *http.Request) {
 		API.HomePageHandler(w, r, pool)
 	})
-	http.HandleFunc("/navigation", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/navigation", func(w http.ResponseWriter, r *http.Request) {
 		API.Navigation(w, r, pool)
 	})
 
@@ -77,7 +74,8 @@ func StartServer() *http.Server {
 		handlers.AllowedOrigins([]string{"*"}), // Allow all origins for testing; adjust for production
 		handlers.AllowedMethods([]string{"GET", "POST", "OPTIONS"}),
 		handlers.AllowedHeaders([]string{"Content-Type"}),
-	)(http.DefaultServeMux)
+	)(mux) // Use custom ServeMux instead of DefaultServeMux
+
 	// Create a new HTTP server
 	server := &http.Server{
 		Addr:    ":8080",
@@ -95,8 +93,8 @@ func StartServer() *http.Server {
 	return server
 }
 
-// ShutdownAndParse checks for scheduled log parsing
-func ShutdownAndParse(sigs chan os.Signal) {
+// check for downtime, and downloadfile
+func SignalShutdown(sigs chan os.Signal) {
 	for {
 		now := time.Now()
 		// Get the current time in EST (Eastern Standard Time)
@@ -107,15 +105,13 @@ func ShutdownAndParse(sigs chan os.Signal) {
 		}
 
 		// Check if today is Saturday and the time is 9 PM
-		if now.In(loc).Weekday() == time.Saturday && now.In(loc).Hour() == 20 && now.In(loc).Minute() == 1 {
+		if now.In(loc).Weekday() == time.Saturday && now.In(loc).Hour() == 20 && now.In(loc).Minute() == 00 {
 			fmt.Println("Scheduled shutdown at 8 PM EST. Parsing log file...")
 			// Trigger server shutdown using the signal channel
-			sigs <- os.Interrupt // Send interrupt signal
-			db_funcs.ParseLogFile()
-			time.Sleep(1 * time.Minute)
+			db_funcs.SftpFileDownload()
+			fmt.Println("Now waiting for next minute tick... (server still serves requests for this 65 sec window)")
+			time.Sleep(65 * time.Second) //make sure it's next minute
+			sigs <- os.Interrupt         // Send interrupt signal
 		}
-
-		// Sleep for 1 minute before checking again
-		time.Sleep(30 * time.Second)
 	}
 }

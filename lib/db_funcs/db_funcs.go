@@ -44,7 +44,7 @@ func ExecuteReadQuery(db *sql.DB, query string) (*sql.Rows, error) {
 	return rows, nil // No error
 }
 func GetGUID(db *sql.DB, uname string) (string, error) {
-	date := GetFileDate()
+	date := GetLastSat()
 	query := fmt.Sprintf("SELECT DISTINCT GUID FROM login_%s WHERE uname = ? LIMIT 1", date) //always GUID1 cuz that player_act
 	row := db.QueryRow(query, uname)
 	var guid string
@@ -63,7 +63,7 @@ func GetGUID(db *sql.DB, uname string) (string, error) {
 }
 
 func InsertToEvent(db *sql.DB, actors []string, datetime string, event_flag bool) error {
-	date := GetFileDate()
+	date := GetLastSat()
 	if strings.Contains(actors[1], "img=ico") {
 		switch actors[1] {
 		case "img=ico_crossbow":
@@ -110,7 +110,7 @@ func InsertToEvent(db *sql.DB, actors []string, datetime string, event_flag bool
 
 func UpdateGUIDs1(db *sql.DB) error {
 	fmt.Println("reached here")
-	date := GetFileDate()
+	date := GetLastSat()
 	// Step 1: Get distinct Player_Act where GUID1 is null
 	query := fmt.Sprintf("SELECT DISTINCT Player_Act FROM event_%s WHERE GUID1 IS NULL", date)
 	rows, err := db.Query(query)
@@ -149,7 +149,7 @@ func UpdateGUIDs1(db *sql.DB) error {
 func UpdateGUIDs2(db *sql.DB) error {
 	fmt.Println("reached here")
 	// Step 1: Get distinct Player_Receive where GUID2 is null
-	date := GetFileDate()
+	date := GetLastSat()
 	query := fmt.Sprintf("SELECT DISTINCT Player_Receive FROM event_%s WHERE GUID2 IS NULL AND Player_Receive is not NULL", date)
 	rows, err := db.Query(query)
 	if err != nil {
@@ -185,7 +185,7 @@ func UpdateGUIDs2(db *sql.DB) error {
 }
 
 func PushNewData() error {
-	date := GetFileDate()
+	date := GetLastSat()
 	query := "SELECT GUID, MIN(uname) AS uname FROM login_" + date + " GROUP BY GUID;"
 	database := MakeConnection()
 	defer database.Close()
@@ -207,8 +207,12 @@ func PushNewData() error {
 		ins_q := `
 		INSERT INTO All_players (GUID, Uname, Last_event, Events_Participated) 
 		VALUES (?, ?, ?, 1) 
-		ON DUPLICATE KEY UPDATE Events_Participated = Events_Participated + 1;`
+		ON DUPLICATE KEY UPDATE 
+		Uname = VALUES(Uname), 
+		Last_event = VALUES(Last_event), 
+		Events_Participated = Events_Participated + 1;`
 		database.Exec(ins_q, guid, uname, date)
+
 	} //all unique GUIDs inserted with A name and events participated updated
 
 	//now get * from event_date and then for each row, if guid2 nil, continue (suicide)

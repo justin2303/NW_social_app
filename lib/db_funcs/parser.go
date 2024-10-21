@@ -168,6 +168,25 @@ func GetFileDate() string {
 	return formattedDate
 }
 
+func GetLastSat() string {
+	est, err := time.LoadLocation("America/New_York")
+	if err != nil {
+		fmt.Println("Error loading timezone:", err)
+		return ""
+	}
+	today := time.Now().In(est)
+	// Check if today is Saturday, return today if true
+	if today.Weekday() != time.Saturday {
+		daysBack := (int(today.Weekday()) + 1) % 7
+		// Subtract the number of days to get the last Saturday
+		today = today.AddDate(0, 0, -daysBack)
+	}
+
+	// Format the date as MM_DD_YY
+	formattedDate := today.Format("01_02_06")
+	return formattedDate
+}
+
 // HasEventStart checks if the line contains specific phrases and starts with "19:"
 func HasEventStart(line string) bool {
 	return strings.Contains(line, "Has reset the Map.") &&

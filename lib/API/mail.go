@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	wp "hydraulicPress/lib/WorkerPool"
+	"hydraulicPress/lib/db_funcs"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -18,8 +19,15 @@ var (
 )
 
 type EmailRequest struct {
+	GUID   string `json:"GUID"`
 	Email  string `json:"Email"`
 	Domain string `json:"Domain"`
+}
+type VerifyRequest struct {
+	GUID         string `json:"GUID"`
+	Email        string `json:"Email"`
+	Domain       string `json:"Domain"`
+	Verification string `json:"Verification"`
 }
 
 func SendEmail(w http.ResponseWriter, r *http.Request, pool *wp.WorkerPool) {
@@ -62,7 +70,7 @@ func SendEmail(w http.ResponseWriter, r *http.Request, pool *wp.WorkerPool) {
 		// Decode the JSON data into the map
 		decoder := json.NewDecoder(file)
 		decoder.Decode(&verificationCodes)
-		verificationCodes[Email_req.Email] = v_code
+		verificationCodes[Email_req.GUID] = v_code
 		jsonData, _ := json.MarshalIndent(verificationCodes, "", "    ")
 		file.Truncate(0)
 		file.Seek(0, 0)
@@ -88,4 +96,58 @@ func SendEmail(w http.ResponseWriter, r *http.Request, pool *wp.WorkerPool) {
 	//success
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("Email sent successfully!"))
+}
+
+func VerifyEmail(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Read the request body
+	body, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "Error reading request body", http.StatusInternalServerError)
+		return
+	}
+	defer r.Body.Close()
+
+	// Unmarshal the JSON body into the LoginRequest struct
+	var Verify_req VerifyRequest
+	err = json.Unmarshal(body, &Verify_req)
+	if err != nil {
+		http.Error(w, "Error parsing JSON", http.StatusBadRequest)
+		return
+	}
+	v_file.Lock()
+	verificationCodes := make(map[string]string)
+	file, _ := os.OpenFile("./data/verification/codes.json", os.O_RDWR|os.O_CREATE, 0644)
+	// Decode the JSON data into the map
+	decoder := json.NewDecoder(file)
+	decoder.Decode(&verificationCodes)
+	actual_code := verificationCodes[Verify_req.GUID]
+	file.Close()
+	v_file.Unlock()
+	if actual_code == Verify_req.Verification {
+		query := "SELECT URL FROM All_players WHERE GUID = ?"
+		db := db_funcs.MakeConnection()
+		var url string
+		err := db.QueryRow(query, Verify_req.GUID).Scan(&url)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		err = UpdateUserMail(url, Verify_req.Email, Verify_req.Domain)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		fmt.Println("verified!")
+
+	} else {
+		w.WriteHeader(http.StatusUnauthorized) //in the future verification errors should be unauthorized status.
+		fmt.Println("wrong code!, actual code is: ", actual_code)
+		fmt.Println("and not: ", Verify_req.Verification)
+	}
 }

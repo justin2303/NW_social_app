@@ -185,18 +185,42 @@ func UpdateGUIDs2(db *sql.DB) error {
 }
 
 func PushNewData() error {
+	create_all := `CREATE TABLE IF NOT EXISTS All_players (
+    GUID VARCHAR(255) NOT NULL PRIMARY KEY,
+    Uname VARCHAR(255),
+    Total_kills INT DEFAULT 0,
+    Total_deaths INT DEFAULT 0,
+    Total_teamkills INT DEFAULT 0,
+    Events_Participated INT DEFAULT 0,
+    Last_Event VARCHAR(255),
+    P_week INT DEFAULT 0,
+    R_week INT DEFAULT 0,
+    URL VARCHAR(255),
+    Reg VARCHAR(255)
+	);`
 	date := GetLastSat()
 	query := "SELECT GUID, MIN(uname) AS uname FROM login_" + date + " GROUP BY GUID;"
 	database := MakeConnection()
 	defer database.Close()
+	database.Exec(create_all)
 	rows, err := ExecuteReadQuery(database, query)
 	if err != nil {
 		fmt.Printf("logs for %s not found\n", date)
 		return err
 	}
 	defer rows.Close() // Close rows after scanning
-
-	// Loop through the rows
+	m_curr_table := `CREATE TABLE parsed_` + GetLastSat() + ` (
+    GUID VARCHAR(255) PRIMARY KEY,
+    Uname VARCHAR(255),
+    Total_deaths INT DEFAULT 0,
+    Total_kills INT DEFAULT 0,
+    Total_teamkills INT DEFAULT 0,
+    URL VARCHAR(255),
+    Reg VARCHAR(255)
+);`
+	curr_name := "parsed_" + GetLastSat()
+	ExecuteQuery(database, m_curr_table)
+	// Loop through login rows
 	for rows.Next() {
 		var guid, uname string
 		// Scan the columns into variables
@@ -211,7 +235,9 @@ func PushNewData() error {
 		Uname = VALUES(Uname), 
 		Last_event = VALUES(Last_event), 
 		Events_Participated = Events_Participated + 1;`
+		ins_curr := `INSERT INTO ` + curr_name + ` (GUID, Uname) values (?,?)`
 		database.Exec(ins_q, guid, uname, date)
+		database.Exec(ins_curr, guid, uname)
 
 	} //all unique GUIDs inserted with A name and events participated updated
 
@@ -237,8 +263,12 @@ func PushNewData() error {
 			if Action.String == "teamkill" {
 				tk_q := "Update All_players SET Total_kills = Total_kills - 1,  Total_teamkills = Total_teamkills + 1   where GUID = ?"
 				database.Exec(tk_q, guid1)
+				tk_curr := "Update " + curr_name + " SET Total_kills = Total_kills - 1,  Total_teamkills = Total_teamkills + 1   where GUID = ?"
+				database.Exec(tk_curr, guid1)
 				tk_q = "Update All_players SET Total_deaths = Total_deaths - 1 where GUID = ?"
+				tk_curr = "Update " + curr_name + " SET Total_deaths = Total_deaths - 1 where GUID = ?"
 				database.Exec(tk_q, guid2)
+				database.Exec(tk_curr, guid2)
 				continue
 			}
 		} else { //if action null, mistake in parsing
@@ -247,7 +277,7 @@ func PushNewData() error {
 		}
 		if !guid1.Valid || !guid2.Valid {
 			//nothing to record, suicide or no player act
-			fmt.Println("player ID missing")
+			fmt.Println("player ID missing, probably a bot")
 			continue
 		}
 		//normal case, not TK, all players valid
@@ -259,11 +289,30 @@ func PushNewData() error {
 		rows3.Scan(&currentKills, &currentDeaths)
 		fmt.Printf("Before Update: Total_kills = %d, Total_deaths = %d for GUID: %s\n", currentKills, currentDeaths, guid1.String)
 		up_q := "Update All_players SET Total_kills = Total_kills + 1 where GUID = ?"
+		up_curr := "Update " + curr_name + " SET Total_kills = Total_kills + 1 where GUID = ?"
 		database.Exec(up_q, guid1.String)
+		database.Exec(up_curr, guid1.String)
 		up_q = "Update All_players SET Total_deaths = Total_deaths + 1 where GUID = ?"
+		up_curr = "Update " + curr_name + " SET Total_deaths = Total_deaths + 1 where GUID = ?"
 		database.Exec(up_q, guid2.String)
+		database.Exec(up_curr, guid2.String)
 		fmt.Println("update executed successfully! for time: ", Time)
 	}
+
+	create_view := "CREATE VIEW player_stats_" + GetLastSat() + `AS
+	SELECT 
+		p.GUID,
+		p.Uname,
+		p.Total_kills,
+		p.Total_deaths,
+		p.Total_teamkills,
+		a.URL,
+		a.Reg
+	FROM 
+		parsed_10_19_24 p
+	JOIN 
+		All_players a ON p.GUID = a.GUID;`
+	database.Exec(create_view)
 	return nil
 
 }

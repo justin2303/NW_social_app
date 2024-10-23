@@ -69,6 +69,12 @@ func StartServer() *http.Server {
 	mux.HandleFunc("/navigation", func(w http.ResponseWriter, r *http.Request) {
 		API.Navigation(w, r, pool)
 	})
+	mux.HandleFunc("/myregiment", func(w http.ResponseWriter, r *http.Request) {
+		API.GetAllRegData(w, r, pool)
+	})
+	mux.HandleFunc("/change-pfp", func(w http.ResponseWriter, r *http.Request) {
+		API.UploadPfp(w, r, pool)
+	})
 
 	corsHandler := handlers.CORS(
 		handlers.AllowedOrigins([]string{"*"}), // Allow all origins for testing; adjust for production

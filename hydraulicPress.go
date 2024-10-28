@@ -75,6 +75,9 @@ func StartServer() *http.Server {
 	mux.HandleFunc("/change-pfp", func(w http.ResponseWriter, r *http.Request) {
 		API.UploadPfp(w, r, pool)
 	})
+	mux.HandleFunc("/fetch_profile", func(w http.ResponseWriter, r *http.Request) {
+		API.FetchProfile(w, r, pool)
+	})
 
 	corsHandler := handlers.CORS(
 		handlers.AllowedOrigins([]string{"*"}), // Allow all origins for testing; adjust for production

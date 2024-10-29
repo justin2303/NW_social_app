@@ -27,9 +27,21 @@ type PlayerConfig struct {
 	Medals       map[string][]string `json:"medals"`
 }
 type FetchProfileResp struct {
+	Pfp          string   `json:"Pfp"`
 	Medal_names  []string `json:"Medal_names"`
 	Medal_images []string `json:"Medal_images"`
 	Medal_desc   []string `json:"Medal_desc"`
+	Faction      string   `json:"Faction"`
+	Bio          string   `json:"Bio"`
+}
+type Preferences struct {
+	Bio     string `json:"Bio"`
+	Faction string `json:"Faction"`
+}
+type SavePrefReq struct {
+	GUID    string `json:"GUID"`
+	Bio     string `json:"Bio"`
+	Faction string `json:"Faction"`
 }
 
 func UploadPfp(w http.ResponseWriter, r *http.Request, pool *wp.WorkerPool) {
@@ -92,6 +104,7 @@ func FetchProfile(w http.ResponseWriter, r *http.Request, pool *wp.WorkerPool) {
 		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
 		return
 	}
+
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, "Error reading request body", http.StatusInternalServerError)
@@ -107,6 +120,10 @@ func FetchProfile(w http.ResponseWriter, r *http.Request, pool *wp.WorkerPool) {
 		return
 	}
 	h_guid := db_funcs.GetHashedGUID(FetchReq.GUID)
+	if h_guid == "" {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
 	filepath := "./data/Players/" + h_guid + "/user_config.json"
 	var user_config PlayerConfig
 	file, err := os.Open(filepath)
@@ -136,22 +153,76 @@ func FetchProfile(w http.ResponseWriter, r *http.Request, pool *wp.WorkerPool) {
 	})
 
 	pool.Enqueue(func() {
-		desclist := MedalImageHelper(user_config.Medals)
+		desclist := MedalDescHelper(user_config.Medals)
 		descchan <- desclist
 	})
-
+	pfp_path := "./data/Players/" + h_guid + "/profile.png"
+	pref_path := "./data/Players/" + h_guid + "/pref.json"
+	Faction, Bio := readPreferences(pref_path)
+	str_img := FetchImageStr(pfp_path)
 	medalnames := <-namechan
 	medalimgs := <-imgchan
 	medaldescs := <-descchan
 	response := FetchProfileResp{
+		Pfp:          str_img,
 		Medal_names:  medalnames,
 		Medal_images: medalimgs,
 		Medal_desc:   medaldescs,
+		Faction:      Faction,
+		Bio:          Bio,
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(response)
+}
+func SavePrefs(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+		return
+	}
 
+	body, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "Error reading request body", http.StatusInternalServerError)
+		return
+	}
+	defer r.Body.Close()
+	var saveReq SavePrefReq
+	err = json.Unmarshal(body, &saveReq)
+	if err != nil {
+		http.Error(w, "Error parsing JSON", http.StatusBadRequest)
+		return
+	}
+
+	// Hash the GUID to get the file path
+	h_guid := db_funcs.GetHashedGUID(saveReq.GUID)
+	if h_guid == "" {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+	filepath := "./data/Players/" + h_guid + "/pref.json"
+
+	// Create a new Preferences struct to save only Bio and Faction
+	preferences := Preferences{
+		Bio:     saveReq.Bio,
+		Faction: saveReq.Faction,
+	}
+
+	// Marshal the updated Preferences struct back into JSON
+	newData, err := json.Marshal(preferences)
+	if err != nil {
+		http.Error(w, "Error marshaling JSON", http.StatusInternalServerError)
+		return
+	}
+
+	// Write the JSON data to pref.json
+	err = ioutil.WriteFile(filepath, newData, 0644) // Use 0644 for file permissions
+	if err != nil {
+		http.Error(w, "Error writing to file", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
 }
 
 func MedalNameHelper(Medals map[string][]string) []string {
@@ -256,5 +327,30 @@ func encodeImageToBase64(imagePath string) (string, error) {
 
 	// Encode the image bytes to base64
 	encoded := base64.StdEncoding.EncodeToString(imageBytes)
+	encoded = "data:image/png;base64," + encoded
 	return encoded, nil
+}
+
+func readPreferences(filePath string) (string, string) {
+	// Open the JSON file
+	file, err := os.Open(filePath)
+	if err != nil {
+		return "", ""
+	}
+	defer file.Close()
+
+	// Read file contents
+	bytes, err := ioutil.ReadAll(file)
+	if err != nil {
+		return "", ""
+	}
+
+	// Unmarshal JSON into Preferences struct
+	var preferences Preferences
+	if err := json.Unmarshal(bytes, &preferences); err != nil {
+		return "", ""
+	}
+
+	// Return faction and bio as separate strings
+	return preferences.Faction, preferences.Bio
 }

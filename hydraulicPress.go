@@ -78,6 +78,7 @@ func StartServer() *http.Server {
 	mux.HandleFunc("/fetch_profile", func(w http.ResponseWriter, r *http.Request) {
 		API.FetchProfile(w, r, pool)
 	})
+	mux.HandleFunc("/save_profile", API.SavePrefs)
 
 	corsHandler := handlers.CORS(
 		handlers.AllowedOrigins([]string{"*"}), // Allow all origins for testing; adjust for production

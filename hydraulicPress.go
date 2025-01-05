@@ -52,8 +52,8 @@ func main() {
 // StartServer sets up and starts the HTTP server
 func StartServer() *http.Server {
 	// Create a new ServeMux to avoid re-registering the same routes
+	db_funcs.ParseLogFile()
 	mux := http.NewServeMux()
-
 	pool := workerpool.NewWorkerPool(10)
 	mux.HandleFunc("/login", API.LoginHandler)
 	mux.HandleFunc("/signup", func(w http.ResponseWriter, r *http.Request) {
@@ -62,7 +62,9 @@ func StartServer() *http.Server {
 	mux.HandleFunc("/recovery_email", func(w http.ResponseWriter, r *http.Request) {
 		API.SendEmail(w, r, pool)
 	})
-	mux.HandleFunc("/verify_email", API.VerifyEmail)
+	mux.HandleFunc("/verify_email", func(w http.ResponseWriter, r *http.Request) {
+		API.VerifyEmail(w, r, pool)
+	})
 	mux.HandleFunc("/home_page", func(w http.ResponseWriter, r *http.Request) {
 		API.HomePageHandler(w, r, pool)
 	})
@@ -72,11 +74,20 @@ func StartServer() *http.Server {
 	mux.HandleFunc("/myregiment", func(w http.ResponseWriter, r *http.Request) {
 		API.GetAllRegData(w, r, pool)
 	})
+	mux.HandleFunc("/lastEvent", func(w http.ResponseWriter, r *http.Request) {
+		API.GetWeeklyData(w, r, pool)
+	})
 	mux.HandleFunc("/change-pfp", func(w http.ResponseWriter, r *http.Request) {
 		API.UploadPfp(w, r, pool)
 	})
 	mux.HandleFunc("/fetch_profile", func(w http.ResponseWriter, r *http.Request) {
 		API.FetchProfile(w, r, pool)
+	})
+	mux.HandleFunc("/getcommendations", func(w http.ResponseWriter, r *http.Request) {
+		API.GetCommendationsData(w, r, pool)
+	})
+	mux.HandleFunc("/commendplayer", func(w http.ResponseWriter, r *http.Request) {
+		API.CommendPlayer(w, r, pool)
 	})
 	mux.HandleFunc("/save_profile", API.SavePrefs)
 

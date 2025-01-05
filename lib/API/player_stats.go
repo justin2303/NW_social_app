@@ -28,6 +28,7 @@ type RegDataResp struct {
 	Reg                 []string `json:"Reg"`
 }
 
+
 func GetAllRegData(w http.ResponseWriter, r *http.Request, pool *wp.WorkerPool) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
@@ -148,4 +149,73 @@ func GetWeeklyData(w http.ResponseWriter, r *http.Request, pool *wp.WorkerPool) 
 		http.Error(w, "Error parsing JSON", http.StatusBadRequest)
 		return
 	}
+
+	last_sat := db_funcs.GetLastSat()
+	db := db_funcs.MakeConnection()
+	defer db.Close()
+	reg_query := "select * from player_stats_" + last_sat + " where Reg = ?"
+	var rows *sql.Rows
+	if RegReq.Regiment != "pub" {
+		rows, err = db.Query(reg_query, RegReq.Regiment)
+	} else {
+		reg_query = "select * from player_stats_" + last_sat + " where Reg is null"
+		rows, err = db.Query(reg_query)
+	}
+	if err != nil {
+		http.Error(w, "Error asking DB", http.StatusBadRequest)
+		return
+	}
+	var Reggies []WeeklyData
+	var GUID, Uname, URL, Reg_buffer sql.NullString
+	var Kills, Deaths, Teamkills int
+
+	for rows.Next() {
+		fmt.Println("parsing row")
+		if err := rows.Scan(&GUID, &Uname, &Kills, &Deaths, &Teamkills, &URL, &Reg_buffer); err != nil {
+			fmt.Println("query error")
+		} // no need to parse validity, since null values .String = ""
+
+		curr_reggie := WeeklyData{
+			GUID:                GUID.String,
+			Uname:               Uname.String,
+			Total_kills:         Kills,
+			Total_deaths:        Deaths,
+			Total_teamkills:     Teamkills,
+			URL:                 URL.String,
+			Reg:                 Reg_buffer.String,
+		}
+		Reggies = append(Reggies, curr_reggie)
+	} //Should be fast, just 1 pass and only appends, no additional parsing
+	resp := RegDataResp{
+		GUID:                []string{}, // Initialize slices for each field
+		Uname:               []string{},
+		Total_kills:         []int{},
+		Total_deaths:        []int{},
+		Total_teamkills:     []int{},
+		URL:                 []string{},
+		Reg:                 []string{},
+	}
+
+	// Loop through Reggies and append each field to the corresponding slice
+	for _, reggie := range Reggies {
+		resp.GUID = append(resp.GUID, reggie.GUID)
+		resp.Uname = append(resp.Uname, reggie.Uname)
+		resp.Total_kills = append(resp.Total_kills, reggie.Total_kills)
+		resp.Total_deaths = append(resp.Total_deaths, reggie.Total_deaths)
+		resp.Total_teamkills = append(resp.Total_teamkills, reggie.Total_teamkills)
+		img64 := ""
+		if reggie.URL != "" {
+			temp_path := "./data/Players/" + reggie.URL + "/profile.png"
+			img64 = FetchImageStr(temp_path)
+			fmt.Println("image: ", img64)
+		}
+		resp.URL = append(resp.URL, img64)
+		resp.Reg = append(resp.Reg, reggie.Reg)
+	}
+	//resp populated
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(resp)
 }
+
+

@@ -28,6 +28,7 @@ type VerifyRequest struct {
 	Email        string `json:"Email"`
 	Domain       string `json:"Domain"`
 	Verification string `json:"Verification"`
+	Password 	 string `json:"Password"`
 }
 
 func SendEmail(w http.ResponseWriter, r *http.Request, pool *wp.WorkerPool) {
@@ -98,7 +99,7 @@ func SendEmail(w http.ResponseWriter, r *http.Request, pool *wp.WorkerPool) {
 	w.Write([]byte("Email sent successfully!"))
 }
 
-func VerifyEmail(w http.ResponseWriter, r *http.Request) {
+func VerifyEmail(w http.ResponseWriter, r *http.Request, pool *wp.WorkerPool) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
 		return
@@ -129,22 +130,19 @@ func VerifyEmail(w http.ResponseWriter, r *http.Request) {
 	file.Close()
 	v_file.Unlock()
 	if actual_code == Verify_req.Verification {
-		query := "SELECT URL FROM All_players WHERE GUID = ?"
-		db := db_funcs.MakeConnection()
-		var url string
-		err := db.QueryRow(query, Verify_req.GUID).Scan(&url)
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-		err = UpdateUserMail(url, Verify_req.Email, Verify_req.Domain)
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
+		fmt.Println("correct code! for", Verify_req.GUID)
 		w.WriteHeader(http.StatusOK)
 		fmt.Println("verified!")
-
+		pool.Enqueue(func() {
+			fmt.Println("trying to hashGUID for ", Verify_req.GUID)
+			hashed_guid := HashGUID(Verify_req.GUID) //hash the guid
+			ins_url_q := fmt.Sprintf("Update All_players SET URL = '%s' where GUID = '%s'", hashed_guid, Verify_req.GUID)
+			database := db_funcs.MakeConnection()
+			db_funcs.ExecuteQuery(database, ins_url_q) //set new url
+			CreateUserConfig(hashed_guid, Verify_req.Password)
+			UpdateUserMail(hashed_guid, Verify_req.Email, Verify_req.Domain)
+			fmt.Println("created userconfig")
+		})
 	} else {
 		w.WriteHeader(http.StatusUnauthorized) //in the future verification errors should be unauthorized status.
 		fmt.Println("wrong code!, actual code is: ", actual_code)

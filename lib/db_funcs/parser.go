@@ -174,12 +174,21 @@ func GetLastSat() string {
 		fmt.Println("Error loading timezone:", err)
 		return ""
 	}
+
 	today := time.Now().In(est)
-	// Check if today is Saturday, return today if true
+
+	// Determine if today is Saturday
 	if today.Weekday() != time.Saturday {
 		daysBack := (int(today.Weekday()) + 1) % 7
 		// Subtract the number of days to get the last Saturday
 		today = today.AddDate(0, 0, -daysBack)
+	} else {
+		// If today is Saturday, check if it's before 8 PM
+		eightPM := time.Date(today.Year(), today.Month(), today.Day(), 20, 0, 0, 0, est)
+		if today.Before(eightPM) {
+			// If before 8 PM, adjust to the previous Saturday
+			today = today.AddDate(0, 0, -7)
+		}
 	}
 
 	// Format the date as MM_DD_YY
@@ -254,6 +263,8 @@ func ParseLogFile() {
 	UpdateGUIDs1(database)
 	UpdateGUIDs2(database)
 	PushNewData()
+	CreateCommends()
+	WeeklyCommendsRelations()
 }
 
 /*

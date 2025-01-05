@@ -11,13 +11,13 @@ import (
 
 func SftpFileDownload() {
 	// SFTP server details
-	sftpServer := "199.127.62.40:8822" // srvr
+	sftpServer := "199.127.62.163:8822" // srvr
 	sftpUser := "FreddyFazbearXXX"     // user
 	sftpPass := "asssniper"            // pass
 
 	// Get Current Date
 	dateString := GetLastSat()
-	remoteFile := fmt.Sprintf("/199.127.62.40_7240/Logs/server_log_%s.txt", dateString)
+	remoteFile := fmt.Sprintf("/199.127.62.163_7240/Logs/server_log_%s.txt", dateString)
 
 	fmt.Println("Using current date:", dateString)
 	fmt.Println("Remote file path:", remoteFile)

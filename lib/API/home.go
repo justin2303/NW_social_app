@@ -25,6 +25,15 @@ type PlayerData struct {
 	URL                 string
 	Reg                 string
 }
+type WeeklyData struct {
+	GUID                string
+	Uname               string
+	Total_kills         int
+	Total_deaths        int
+	Total_teamkills     int
+	URL                 string
+	Reg                 string
+}
 
 type HomePageReq struct {
 	GUID string `json:"GUID"`

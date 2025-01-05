@@ -299,20 +299,7 @@ func PushNewData() error {
 		fmt.Println("update executed successfully! for time: ", Time)
 	}
 
-	create_view := "CREATE VIEW player_stats_" + GetLastSat() + `AS
-	SELECT 
-		p.GUID,
-		p.Uname,
-		p.Total_kills,
-		p.Total_deaths,
-		p.Total_teamkills,
-		a.URL,
-		a.Reg
-	FROM 
-		parsed_10_19_24 p
-	JOIN 
-		All_players a ON p.GUID = a.GUID;`
-	database.Exec(create_view)
+	JustCreateView()
 	return nil
 
 }
@@ -378,4 +365,93 @@ func GetHashedGUID(guid string) string {
 	}
 	return guid
 
+}
+
+func CreateCommends() {
+	database := MakeConnection()
+	defer database.Close()
+
+	// Define the table creation query with additional columns
+	createTable := `
+	CREATE TABLE commends_` + GetLastSat() + ` AS
+	SELECT 
+		p.GUID,
+		p.Uname,
+		p.Total_kills,
+		p.Total_deaths,
+		0 AS N_commends, -- Add a new column with default value 0
+		3 AS Commends_left -- Add a new column with default value 3
+	FROM 
+		parsed_` +GetLastSat() +` p
+	JOIN 
+		All_players a ON p.GUID = a.GUID;`
+	_, err := database.Exec(createTable)
+	if err != nil {
+		fmt.Println("Error creating table:", err)
+	} else {
+		fmt.Println("Table commends_" + GetLastSat() + " created successfully")
+	}
+
+}
+
+func WeeklyCommendsRelations(){
+	database := MakeConnection()
+	defer database.Close()
+	drop_q:=`drop table weekly_commendations`
+	database.Exec(drop_q)
+	create_q:=`CREATE TABLE weekly_commendations (
+    Commender VARCHAR(255) NOT NULL,
+    Commendee_a VARCHAR(255) DEFAULT '',
+    Commendee_b VARCHAR(255) DEFAULT '',
+    Commendee_c VARCHAR(255) DEFAULT '',
+    PRIMARY KEY (Commender)
+	);`
+	_, err := database.Exec(create_q)
+	if err != nil {
+		fmt.Println("Error creating table:", err)
+	} else {
+		fmt.Println("weekly_commendations created successfully")
+	}
+	insert_q :=`INSERT INTO weekly_commendations (Commender) 
+	SELECT DISTINCT GUID 
+	FROM parsed_` +  GetLastSat() +";"
+	database.Exec(insert_q)
+}
+
+func JustCreateView() {
+	fmt.Println("Making pstats for", GetLastSat())
+
+	// Get the last Saturday's date once and reuse it
+	lastSat := GetLastSat()
+
+	// Establish database connection
+	database := MakeConnection()
+	defer database.Close()
+
+	// Build the SQL statement
+	createViewSQL := `
+		CREATE OR REPLACE VIEW player_stats_` + lastSat + ` AS
+		SELECT 
+			p.GUID,
+			p.Uname,
+			p.Total_kills,
+			p.Total_deaths,
+			p.Total_teamkills,
+			a.URL,
+			a.Reg
+		FROM 
+			parsed_` + lastSat + ` p
+		JOIN 
+			All_players a ON p.GUID = a.GUID;`
+
+	// Print the SQL for debugging
+	fmt.Println("Executing SQL:", createViewSQL)
+
+	// Execute the SQL statement
+	if _, err := database.Exec(createViewSQL); err != nil {
+		fmt.Println("Error creating view:", err)
+		return
+	}
+
+	fmt.Println("View created successfully")
 }

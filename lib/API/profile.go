@@ -201,11 +201,11 @@ func SavePrefs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	filepath := "./data/Players/" + h_guid + "/pref.json"
-
+	faction_string := strings.TrimSuffix(saveReq.Faction, ".png")
 	// Create a new Preferences struct to save only Bio and Faction
 	preferences := Preferences{
 		Bio:     saveReq.Bio,
-		Faction: saveReq.Faction,
+		Faction: faction_string,
 	}
 
 	// Marshal the updated Preferences struct back into JSON

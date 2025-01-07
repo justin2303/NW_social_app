@@ -52,7 +52,6 @@ func main() {
 // StartServer sets up and starts the HTTP server
 func StartServer() *http.Server {
 	// Create a new ServeMux to avoid re-registering the same routes
-	db_funcs.ParseLogFile()
 	mux := http.NewServeMux()
 	pool := workerpool.NewWorkerPool(10)
 	mux.HandleFunc("/login", API.LoginHandler)
@@ -90,6 +89,9 @@ func StartServer() *http.Server {
 		API.CommendPlayer(w, r, pool)
 	})
 	mux.HandleFunc("/save_profile", API.SavePrefs)
+	mux.HandleFunc("/resetPass", API.ResetPassHandler)
+	mux.HandleFunc("/verifyReset", API.VerifyReset)
+	mux.HandleFunc("/changePass", API.ChangePassReq)
 
 	corsHandler := handlers.CORS(
 		handlers.AllowedOrigins([]string{"*"}), // Allow all origins for testing; adjust for production

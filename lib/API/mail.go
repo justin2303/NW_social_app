@@ -149,3 +149,101 @@ func VerifyEmail(w http.ResponseWriter, r *http.Request, pool *wp.WorkerPool) {
 		fmt.Println("and not: ", Verify_req.Verification)
 	}
 }
+
+func FetchEmail(URL string) (string, string){
+	fmt.Println("URL: ", URL)
+	filename := "./data/Players/" + URL + "/user_config.json"
+	file, err := os.OpenFile(filename, os.O_RDONLY, 0644)
+	if err != nil {
+		fmt.Println("error opening file")
+		return "", ""
+	}
+	defer file.Close()
+	user_json := make(map[string]string)
+	decoder := json.NewDecoder(file)
+	decoder.Decode(&user_json)
+	if err != nil {
+		fmt.Println("Error decoding JSON:", err)
+		return "", ""
+	}
+	gmail := user_json["gmail"]
+	domainName := user_json["domain_name"]
+
+	return gmail, domainName
+}
+func SendCode(GUID, gmail string, domain string) bool {
+	smtpHost := "smtp.gmail.com"
+	smtpPort := 587
+	from := "61e.Hussars.NA@gmail.com"
+	password := "qdyl mrjt hwvs vkdo" // App password generated from Google
+
+	to := gmail + "@" + domain
+	v_code := GenerateCode()
+	v_file.Lock()
+	verificationCodes := make(map[string]string)
+	file, _ := os.OpenFile("./data/verification/codes.json", os.O_RDWR|os.O_CREATE, 0644)
+	// Decode the JSON data into the map
+	decoder := json.NewDecoder(file)
+	decoder.Decode(&verificationCodes)
+	verificationCodes[GUID] = v_code
+	jsonData, _ := json.MarshalIndent(verificationCodes, "", "    ")
+	file.Truncate(0)
+	file.Seek(0, 0)
+	file.Write(jsonData)
+	file.Close()
+	v_file.Unlock()
+	msg := gomail.NewMessage()
+	msg.SetHeader("From", from)
+	msg.SetHeader("To", to)
+	msg.SetHeader("Subject", "NW Email Verification")
+	message_str := v_code + " is your verification code, enter it within the next 2 minutes to verify your email."
+	msg.SetBody("text/html", message_str)
+	// Set up the SMTP dialer
+	d := gomail.NewDialer(smtpHost, smtpPort, from, password)
+	if err := d.DialAndSend(msg); err != nil {
+		fmt.Println("Error sending email:", err)
+		return false
+	} else {
+		fmt.Println("Email sent successfully!")
+		return true
+	}
+}
+
+func FetchVCode(GUID string) string{
+	v_file.Lock()
+	verificationCodes := make(map[string]string)
+	file, _ := os.OpenFile("./data/verification/codes.json", os.O_RDWR|os.O_CREATE, 0644)
+	// Decode the JSON data into the map
+	decoder := json.NewDecoder(file)
+	decoder.Decode(&verificationCodes)
+	actual_code := verificationCodes[GUID]
+	file.Close()
+	v_file.Unlock()
+	return actual_code
+}
+
+func ChangePass(URL string, Password string) bool {
+	filename := "./data/Players/" + URL + "/user_config.json"
+	file, err := os.OpenFile(filename, os.O_RDWR, 0644)
+	if err != nil {
+		fmt.Println("Error opening file:", err)
+		return false
+	}
+	defer file.Close()
+	user_json := make(map[string]string)
+	decoder := json.NewDecoder(file)
+	decoder.Decode(&user_json)
+	if err != nil {
+		fmt.Println("Error decoding JSON:", err)
+		return false
+	}
+	user_json["password"] = Password
+	file.Seek(0, 0)
+	encoder := json.NewEncoder(file)
+	encoder.SetIndent("", "  ")
+	if err := encoder.Encode(&user_json); err != nil {
+		fmt.Println("Error encoding JSON:", err)
+		return false
+	}
+	return true
+}

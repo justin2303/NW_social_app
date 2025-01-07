@@ -230,18 +230,18 @@ func ChangePass(URL string, Password string) bool {
 		return false
 	}
 	defer file.Close()
-	user_json := make(map[string]string)
+	var user_config PlayerConfig
 	decoder := json.NewDecoder(file)
-	decoder.Decode(&user_json)
+	decoder.Decode(&user_config)
 	if err != nil {
 		fmt.Println("Error decoding JSON:", err)
 		return false
 	}
-	user_json["password"] = Password
+	user_config.Password = Password
 	file.Seek(0, 0)
 	encoder := json.NewEncoder(file)
 	encoder.SetIndent("", "  ")
-	if err := encoder.Encode(&user_json); err != nil {
+	if err := encoder.Encode(&user_config); err != nil {
 		fmt.Println("Error encoding JSON:", err)
 		return false
 	}

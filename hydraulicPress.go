@@ -92,6 +92,7 @@ func StartServer() *http.Server {
 	mux.HandleFunc("/resetPass", API.ResetPassHandler)
 	mux.HandleFunc("/verifyReset", API.VerifyReset)
 	mux.HandleFunc("/changePass", API.ChangePassReq)
+	mux.HandleFunc("/adminlogin", API.AdminLogin)
 
 	corsHandler := handlers.CORS(
 		handlers.AllowedOrigins([]string{"*"}), // Allow all origins for testing; adjust for production

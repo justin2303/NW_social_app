@@ -10,11 +10,18 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"sync"
+)
+var (
+	session_lock sync.Mutex 
 )
 
 type LoginRequest struct {
 	GUID     string `json:"GUID"`
 	Password string `json:"Password"`
+}
+type LoginResponse struct {
+	Session  string `json:"Session"`
 }
 type CreateConfigReq struct {
 	Email      string `json:"Email"`
@@ -58,8 +65,17 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if VerifyLogin(loginRequest.GUID, loginRequest.Password) {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("valid login"))
+		tf, session := GenerateSessionCode(loginRequest.GUID)
+		if (tf){
+			resp := LoginResponse{
+				Session: session,
+			}
+			w.WriteHeader(http.StatusOK)
+			json.NewEncoder(w).Encode(resp)
+		} else {
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte("valid login but server having issues, please try again"))
+		}
 	} else {
 		w.WriteHeader(http.StatusNotFound)
 		w.Write([]byte("invalid login"))
@@ -242,4 +258,64 @@ func VerifyLogin(guid string, pass string) bool {
 	decoder.Decode(&user_json)
 	password := user_json["password"]
 	return password == pass
+}
+
+func GenerateSessionCode(GUID string) (bool, string){
+	code := GenerateCode()
+	session_lock.Lock()
+	defer session_lock.Unlock()
+	filename := "data/session/codes.json"
+	file, err := os.OpenFile(filename, os.O_RDWR, 0644)
+	if err != nil {
+		fmt.Println("Error opening file:", err)
+		return false,""
+	}
+	defer file.Close()
+	var sessionCodes map[string]string
+	decoder := json.NewDecoder(file)
+	if err := decoder.Decode(&sessionCodes); err != nil {
+		fmt.Println("Error decoding JSON:", err)
+		return false, ""
+	}
+	sessionCodes[GUID] = code
+	if _, err := file.Seek(0, 0); err != nil {
+		fmt.Println("Error seeking file:", err)
+		return false, ""
+	}
+	if err := file.Truncate(0); err != nil {
+		fmt.Println("Error truncating file:", err)
+		return false, ""
+	}
+	encoder := json.NewEncoder(file)
+	encoder.SetIndent("", "  ")
+	if err := encoder.Encode(&sessionCodes); err != nil {
+		fmt.Println("Error encoding JSON:", err)
+		return false, ""
+	}
+	return true, code
+}
+
+
+func CheckSession(GUID string, Code string) bool {
+	session_lock.Lock()
+	defer session_lock.Unlock()
+
+	filename := "data/session/codes.json"
+	file, err := os.OpenFile(filename, os.O_RDONLY, 0644)
+	if err != nil {
+		fmt.Println("Error opening file:", err)
+		return false
+	}
+	defer file.Close()
+
+	var sessionCodes map[string]string
+	decoder := json.NewDecoder(file)
+	if err := decoder.Decode(&sessionCodes); err != nil {
+		fmt.Println("Error decoding JSON:", err)
+		return false
+	}
+	if sessionCodes[GUID] == Code {
+		return true
+	}
+	return false
 }

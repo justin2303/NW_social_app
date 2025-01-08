@@ -131,18 +131,27 @@ func VerifyEmail(w http.ResponseWriter, r *http.Request, pool *wp.WorkerPool) {
 	v_file.Unlock()
 	if actual_code == Verify_req.Verification {
 		fmt.Println("correct code! for", Verify_req.GUID)
-		w.WriteHeader(http.StatusOK)
-		fmt.Println("verified!")
-		pool.Enqueue(func() {
-			fmt.Println("trying to hashGUID for ", Verify_req.GUID)
-			hashed_guid := HashGUID(Verify_req.GUID) //hash the guid
-			ins_url_q := fmt.Sprintf("Update All_players SET URL = '%s' where GUID = '%s'", hashed_guid, Verify_req.GUID)
-			database := db_funcs.MakeConnection()
-			db_funcs.ExecuteQuery(database, ins_url_q) //set new url
-			CreateUserConfig(hashed_guid, Verify_req.Password)
-			UpdateUserMail(hashed_guid, Verify_req.Email, Verify_req.Domain)
-			fmt.Println("created userconfig")
-		})
+		tf, session := GenerateSessionCode(Verify_req.GUID)
+		if tf {
+			resp := LoginResponse{
+				Session: session,
+			}
+			pool.Enqueue(func() {
+				fmt.Println("trying to hashGUID for ", Verify_req.GUID)
+				hashed_guid := HashGUID(Verify_req.GUID) //hash the guid
+				ins_url_q := fmt.Sprintf("Update All_players SET URL = '%s' where GUID = '%s'", hashed_guid, Verify_req.GUID)
+				database := db_funcs.MakeConnection()
+				db_funcs.ExecuteQuery(database, ins_url_q) //set new url
+				CreateUserConfig(hashed_guid, Verify_req.Password)
+				UpdateUserMail(hashed_guid, Verify_req.Email, Verify_req.Domain)
+				fmt.Println("created userconfig")
+			})
+			w.WriteHeader(http.StatusOK)
+			json.NewEncoder(w).Encode(resp)
+			fmt.Println("verified!")
+		} else {
+			w.WriteHeader(http.StatusInternalServerError)
+		}
 	} else {
 		w.WriteHeader(http.StatusUnauthorized) //in the future verification errors should be unauthorized status.
 		fmt.Println("wrong code!, actual code is: ", actual_code)

@@ -21,6 +21,7 @@ type CommendReq struct {
 	Regiment string `json:"Regiment"`
 	GUID     string `json:"GUID"`
 	ToCommend string `json:"ToCommend"`
+	Session   string `json:"Session"`
 }
 type CommendsResp struct {
 	Commends_left         	int `json:"Commends_left"`
@@ -401,6 +402,10 @@ func CommendPlayer(w http.ResponseWriter, r *http.Request, pool *wp.WorkerPool){
 	err = json.Unmarshal(body, &CommendsReq)
 	if err != nil {
 		http.Error(w, "Error parsing JSON", http.StatusBadRequest)
+		return
+	}
+	if !CheckSession(CommendsReq.GUID, CommendsReq.Session){
+		http.Error(w, "invalid session id", http.StatusBadRequest)
 		return
 	}
 	fmt.Println("Commending Player", CommendsReq.ToCommend )

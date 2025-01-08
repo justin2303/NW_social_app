@@ -15,6 +15,7 @@ import (
 type UploadProfileReq struct {
 	GUID    string `json:"GUID"`
 	Picture string `json:"Picture"`
+	Session string `json:"Session"`
 }
 type FetchProfileReq struct {
 	GUID string `json:"GUID"`
@@ -42,6 +43,7 @@ type SavePrefReq struct {
 	GUID    string `json:"GUID"`
 	Bio     string `json:"Bio"`
 	Faction string `json:"Faction"`
+	Session string `json:"Session"`
 }
 
 func UploadPfp(w http.ResponseWriter, r *http.Request, pool *wp.WorkerPool) {
@@ -66,6 +68,10 @@ func UploadPfp(w http.ResponseWriter, r *http.Request, pool *wp.WorkerPool) {
 	if UploadReq.GUID == "" {
 		return
 	} //no guid case
+	if  !CheckSession(UploadReq.GUID, UploadReq.Session ) {
+		http.Error(w, "invalid session id", http.StatusInternalServerError)
+		return 
+	}
 	imgchan := make(chan []byte)
 
 	pool.Enqueue(func() {
@@ -192,6 +198,10 @@ func SavePrefs(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, "Error parsing JSON", http.StatusBadRequest)
 		return
+	}
+	if  !CheckSession(saveReq.GUID, saveReq.Session ) {
+		http.Error(w, "invalid session id", http.StatusInternalServerError)
+		return 
 	}
 
 	// Hash the GUID to get the file path

@@ -41,7 +41,7 @@ func AdminLogin(w http.ResponseWriter, r *http.Request) {
 			resp := LoginResponse{
 				Session: session,
 			}
-			fmt.Println("valid admin login", err)
+			fmt.Println("valid admin login")
 			w.WriteHeader(http.StatusOK)
 			json.NewEncoder(w).Encode(resp)
 		} else {
@@ -132,3 +132,4 @@ func CheckSessionAdmin(Uname string, Code string) bool {
 	}
 	return false
 }
+

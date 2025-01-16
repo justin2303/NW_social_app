@@ -1,6 +1,7 @@
 package API
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"hydraulicPress/lib/db_funcs"
@@ -34,6 +35,20 @@ type OrderReq struct {
 	Uname	 string `json:"Uname"`
 	Session  string `json:"Session"`
 	Order	 string `json:"Order"`
+}
+type FetchReggiesAdminReq struct {
+	Regiment string `json:"Regiment"`
+	Uname	 string `json:"Uname"`
+	Session  string `json:"Session"`
+}
+type AdminReggiesResp struct{
+	GUID	[]string `json:"GUID"`
+	Uname	[]string `json:"Uname"`
+	Pfp		[]string `json:"Pfp"`
+	P_week	[]int `json:"P_week"`
+	Grade	[]string `json:"Grade"`
+	Unit 	[]string `json:"Unit"`
+	Ordre	[]string `json:"Ordre"`
 }
 
 
@@ -175,6 +190,37 @@ func GivePlayerOrder(w http.ResponseWriter, r *http.Request){
 		return
 	} 
 }
+func FetchReggiesforAdmins(w http.ResponseWriter, r *http.Request){
+	if r.Method != http.MethodPost {
+		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+		return
+	}
+	body, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "Error reading request body", http.StatusInternalServerError)
+		return
+	}
+	defer r.Body.Close()
+	var request FetchReggiesAdminReq
+	err = json.Unmarshal(body, &request)
+	if err != nil {
+		http.Error(w, "Error parsing JSON", http.StatusBadRequest)
+		return
+	}
+	if !CheckSessionAdmin(request.Uname, request.Session){
+		http.Error(w, "invalid session id", http.StatusBadRequest)
+		return
+	}
+	if CreateRegTable(request.Regiment) {
+		resp := FetchUnamesPfpsbyGUID(request.Regiment)
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(resp)
+	} else{
+		http.Error(w, "Error accessing reg table", http.StatusBadRequest)
+		return
+	} 
+
+}
 
 
 func CreateRegTable(Reg string) bool{
@@ -243,4 +289,52 @@ func SetOrder(Reg string, Order string, GUID string) bool {
 		return false
 	}
 	return true
+} 
+func FetchUnamesPfpsbyGUID(Reg string) (AdminReggiesResp) {
+	fetch_q := fmt.Sprintf(`SELECT 
+		a.URL, a.Uname, 
+		r.GUID, r.Grade, r.Unit, r.PoW, r.Ordre
+	FROM 
+		All_players a
+	JOIN 
+		reg_%s r ON a.GUID = r.GUID;`, Reg)
+	db:= db_funcs.MakeConnection()
+	defer db.Close()
+	rows, err := db.Query(fetch_q)
+	var resp AdminReggiesResp
+	if err != nil {
+		fmt.Printf("Failed to execute query: ", err)
+		return resp
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var uname,GUID string
+		var P_week int
+		var url,  Gr, Un, Ord  sql.NullString
+		if err := rows.Scan(&url, &uname, &GUID, &Gr, &Un, &P_week, &Ord); err != nil {
+			fmt.Printf("Failed to scan row:", err)
+		}
+		if url.Valid {
+			pfp_path := "./data/Players/" + url.String + "/profile.png"
+			resp.Pfp = append(resp.Pfp,FetchImageStr(pfp_path))
+		} else {
+			resp.Pfp = append(resp.Pfp, "")
+		}
+		type AdminReggiesResp struct{
+			GUID	[]string `json:"GUID"`
+			Uname	[]string `json:"Uname"`
+			Pfp		[]string `json:"Pfp"`
+			P_week	[]int `json:"P_week"`
+			Grade	[]string `json:"Grade"`
+			Unit 	[]string `json:"Unit"`
+			Ordre	[]string `json:"Ordre"`
+		}		
+		resp.Grade = append(resp.Grade, Gr.String)
+		resp.Unit = append(resp.Unit, Un.String)
+		resp.Ordre = append(resp.Ordre, Ord.String)
+		resp.P_week = append(resp.P_week, P_week)
+		resp.GUID = append(resp.GUID, GUID)
+		resp.Uname = append(resp.Uname, uname)
+	}
+	return resp
 } 

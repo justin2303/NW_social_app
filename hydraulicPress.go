@@ -99,6 +99,7 @@ func StartServer() *http.Server {
 	mux.HandleFunc("/setrank", API.GivePlayerRank)
 	mux.HandleFunc("/setrole", API.GivePlayerRole)
 	mux.HandleFunc("/setorder", API.GivePlayerOrder)
+	mux.HandleFunc("/fetchreggies", API.FetchReggiesforAdmins)
 	corsHandler := handlers.CORS(
 		handlers.AllowedOrigins([]string{"*"}), // Allow all origins for testing; adjust for production
 		handlers.AllowedMethods([]string{"GET", "POST", "OPTIONS"}),
